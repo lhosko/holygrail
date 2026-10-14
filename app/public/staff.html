@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Storm the Castle · Staff</title>
+<style>
+  :root { --bg: #111318; --panel: #1c1f27; --ink: #ecebe6; --dim: #9b998f; --gold: #e8b64c; --green: #4cc38a; --red: #e85c4c; --violet: #a77be8; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.4 "SF Mono", ui-monospace, Menlo, monospace; }
+  button, select, input { font: inherit; color: inherit; }
+  button { background: #2b3040; border: 1px solid #ffffff22; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+  button:hover { border-color: var(--gold); }
+  button.primary { background: var(--gold); color: #1b1505; font-weight: 700; }
+  button.danger { background: #4a1f1f; }
+  select { background: #2b3040; border: 1px solid #ffffff22; border-radius: 8px; padding: 7px; }
+  .wrap { display: grid; grid-template-columns: 360px 1fr; gap: 16px; padding: 16px; height: 100vh; }
+  .panel { background: var(--panel); border-radius: 12px; padding: 14px; overflow: auto; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); margin: 16px 0 8px; }
+  h2:first-child { margin-top: 0; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  .health { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .h { padding: 6px 8px; border-radius: 6px; background: #ffffff0a; }
+  .h.ok::before { content: "● "; color: var(--green); } .h.bad::before { content: "● "; color: var(--red); } .h.na::before { content: "○ "; color: var(--dim); }
+  .seal { background: #3a1d3f; border: 2px solid var(--violet); border-radius: 10px; padding: 12px; display: none; }
+  .seal.show { display: block; }
+  .trace { border-left: 4px solid var(--dim); background: #ffffff07; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+  .trace.opened, .trace.leaked { border-color: var(--green); } .trace.blocked_regex { border-color: #4c7de8; }
+  .trace.blocked_airs { border-color: var(--violet); } .trace.error { border-color: var(--red); } .trace.taunted, .trace.blocked_toxic { border-color: var(--gold); }
+  .trace .top { display: flex; justify-content: space-between; gap: 10px; }
+  .trace .out { font-weight: 700; }
+  .trace .meta { color: var(--dim); font-size: 13px; }
+  .trace pre { white-space: pre-wrap; word-break: break-word; background: #0c0d11; padding: 8px; border-radius: 6px; margin: 6px 0 0; font-size: 12.5px; max-height: 260px; overflow: auto; }
+  .v { display: inline-block; padding: 2px 8px; border-radius: 999px; margin: 4px 4px 0 0; font-size: 12.5px; background: #ffffff10; }
+  .v.fail { background: #4a1f1f; } .v.pass { background: #1b3a2a; } .v.skip { background: #ffffff10; color: #aaa; } .v.open { background: #4a3a10; }
+  #login { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; gap: 10px; }
+  #login input { background: #2b3040; border: 1px solid #ffffff22; border-radius: 8px; padding: 10px; width: 160px; }
+  .warn { color: var(--red); font-weight: 700; }
+  label { cursor: pointer; }
+</style>
+</head>
+<body>
+<div id="login"><input id="pin" type="password" placeholder="Staff PIN" autofocus><button class="primary" id="go">Enter</button></div>
+
+<div class="wrap">
+  <section class="panel">
+    <h2>Health</h2>
+    <div class="health" id="health"></div>
+    <div id="directWarn" class="warn" style="display:none;margin-top:8px">DIRECT_MODEL=1: gateway bypassed, no guardrails!</div>
+
+    <h2>Royal Seal (L4 · human approval)</h2>
+    <div class="row"><label><input type="checkbox" id="royal"> Require Royal Seal before the bridge opens</label></div>
+    <div class="seal" id="seal">
+      <div>⚜️ The guard wants to <b>open_bridge</b>.</div>
+      <div id="sealText" style="color:var(--dim);margin:6px 0"></div>
+      <div class="row"><button class="primary" id="approve">Apply Royal Seal</button><button class="danger" id="deny">Deny</button></div>
+    </div>
+
+    <h2>Visitor</h2>
+    <div class="row" id="visitor"></div>
+    <div class="row">
+      <select id="level"><option value="1">Level 1 · prompt only</option><option value="2">Level 2 · regex</option><option value="3">Level 3 · AIRS</option></select>
+      <select id="scenario"><option value="">No bonus</option><option value="trojan">🐰 Trojan Rabbit</option><option value="password">🔑 Password</option></select>
+    </div>
+    <div class="row"><button id="newVisitor">New knight</button><button id="hide">Hide / show TV (H)</button></div>
+
+    <h2>Model</h2>
+    <div class="row"><select id="model"></select></div>
+
+    <h2>World</h2>
+    <div class="row">
+      <button id="reset">Reset castle</button>
+      <button id="open">Open bridge (manual)</button>
+      <button class="danger" id="rebuild">Rebuild castle</button>
+    </div>
+    <div class="row">
+      <span style="color:var(--dim)">Camera:</span>
+      <button data-shot="wide">wide</button><button data-shot="sentry">sentry</button><button data-shot="lever">lever</button>
+      <button data-shot="bridge">bridge</button><button data-shot="courtyard">courtyard</button>
+    </div>
+
+    <h2>Content</h2>
+    <div class="row"><button id="reload">Reload cards.json</button><button class="danger" id="resetHall">Clear Hall of Knights</button></div>
+    <div id="stats" style="color:var(--dim)"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Live traces <span style="text-transform:none;letter-spacing:0">(open the SCM AI Gateway logs alongside; trace ids match)</span></h2>
+    <div id="traces"></div>
+  </section>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let pin = sessionStorage.pin || '';
+let S = null;
+
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+async function api(path, body, staff = true) {
+  const r = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json', ...(staff ? { 'x-staff-pin': pin } : {}) }, body: JSON.stringify(body || {}) });
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401) { $('login').style.display = 'flex'; throw new Error('PIN'); }
+  if (!r.ok) { alert(j.error || r.status); throw new Error(j.error); }
+  return j;
+}
+
+async function login() {
+  pin = $('pin').value || pin;
+  try { await api('/api/staff/check'); sessionStorage.pin = pin; $('login').style.display = 'none'; } catch {}
+}
+$('go').onclick = login;
+$('pin').addEventListener('keydown', (e) => e.key === 'Enter' && login());
+if (pin) login();
+
+function render() {
+  if (!S) return;
+  const h = S.health || {};
+  $('health').innerHTML = ['gateway', 'configs', 'model', 'whisper', 'minecraft', 'sentry', 'knight', 'camera', 'mcp']
+    .map((k) => `<div class="h ${h[k] == null ? 'na' : h[k] ? 'ok' : 'bad'}"${k === 'mcp' && h.mcpDetail?.error ? ` title="${esc(h.mcpDetail.error)}"` : ''}>${k === 'mcp' ? 'mcp tools' : k}${k === 'mcp' && h.mcpDetail && !h.mcpDetail.viaGateway ? ' (direct!)' : ''}</div>`).join('');
+  $('directWarn').style.display = S.direct ? 'block' : 'none';
+  $('royal').checked = S.royalSeal;
+  $('seal').classList.toggle('show', S.sealPending);
+  $('level').value = String(S.visitor.level);
+  $('scenario').value = S.visitor.scenario || '';
+  $('model').innerHTML = S.models.map((m) => `<option ${m === S.model ? 'selected' : ''}>${esc(m)}</option>`).join('');
+  $('visitor').innerHTML = `id ${esc(S.visitor.id)} · ${S.visitor.attempts} attempts · ${esc(S.visitor.knightName || 'no title yet')} · bridge ${esc(S.bridge)}`;
+  $('stats').textContent = 'Today: ' + Object.entries(S.hall.stats || {}).map(([k, v]) => `${k} ${v}`).join(' · ');
+}
+
+function addTrace(r) {
+  const verdicts = (r.verdicts || []).map((v) => {
+    const a = v.airs ? ` ${v.airs.category || ''} ${[...(v.airs.promptDetected || []), ...(v.airs.responseDetected || [])].join(',')} scan=${v.airs.scanId || '-'}` : '';
+    const [cls, word] = v.skipped ? ['skip', 'skipped: ' + v.skipped] : v.failedOpen ? ['open', 'ERROR, failed open'] : v.passed ? ['pass', 'pass'] : ['fail', 'FAIL'];
+    return `<span class="v ${cls}">${v.turn > 1 ? 'turn 2 · ' : ''}${v.phase} · ${esc(v.kind)} · ${esc(word)}${v.ms != null ? ' · ' + v.ms + 'ms' : ''}${esc(a)}${v.error ? ' · err ' + esc(v.error) : ''}</span>`;
+  }).join('');
+  const el = document.createElement('div');
+  el.className = `trace ${r.outcome}`;
+  el.innerHTML = `<div class="top"><span class="out">${esc(r.outcome)}${r.awaitingSeal ? ' (awaiting seal)' : ''}</span>
+    <span class="meta">L${r.level}${r.scenario ? ' / ' + esc(r.scenario) : ''} · HTTP ${r.status ?? '-'} · ${r.latencyMs ?? '-'} ms · ${esc(r.model || '')} · ${r.usage ? (r.usage.total_tokens ?? '?') + ' tok' : ''}</span></div>
+    <div class="meta">${esc(r.traceId || '')} · card ${esc(r.cardId || 'own words')}${r.direct ? ' · <span class="warn">DIRECT</span>' : ''}</div>
+    <div>${verdicts || '<span class="meta">no guardrail results</span>'}</div>
+    ${r.tool ? `<div class="meta">🛠 ${esc(r.tool.name)}(${esc(JSON.stringify(r.tool.args))}) · ${r.tool.ms} ms · ${r.tool.viaGateway ? 'via gateway MCP' : '<span class="warn">direct, not via gateway</span>'}${r.tool.fallback ? ` · <span class="warn">fallback: ${esc(r.tool.error)}</span>` : ''} → "${esc(r.tool.result)}"</div>` : ''}
+    ${r.turns?.length > 1 ? `<div class="meta">${r.turns.map((t) => `turn ${t.turn}: HTTP ${t.status ?? '-'} · ${t.latencyMs ?? '-'} ms`).join(' · ')}</div>` : ''}
+    ${r.error ? `<div class="warn">${esc(r.error)}</div>` : ''}
+    <pre>said: ${esc(r.dialogue)}${r.raw ? '\nraw:  ' + esc(r.raw) : ''}${r.gateContext ? '\ngate: ' + esc(r.gateContext) : ''}</pre>`;
+  $('traces').prepend(el);
+  while ($('traces').children.length > 40) $('traces').lastChild.remove();
+}
+
+$('royal').onchange = () => api('/api/staff/royal-seal', { enabled: $('royal').checked });
+$('approve').onclick = () => api('/api/staff/seal', { approve: true });
+$('deny').onclick = () => api('/api/staff/seal', { approve: false });
+$('level').onchange = () => api('/api/level', { level: Number($('level').value) }, false);
+$('scenario').onchange = () => api('/api/scenario', { scenario: $('scenario').value || null }, false);
+$('newVisitor').onclick = () => api('/api/visitor', {}, false);
+$('hide').onclick = () => api('/api/staff/hide', {});
+$('model').onchange = () => api('/api/staff/model', { model: $('model').value });
+$('reset').onclick = () => api('/api/staff/reset');
+$('open').onclick = () => api('/api/staff/open');
+$('rebuild').onclick = () => confirm('Rebuild the whole castle (takes a few seconds)?') && api('/api/staff/rebuild');
+$('reload').onclick = () => api('/api/staff/reload-content');
+$('resetHall').onclick = () => confirm("Clear today's Hall of Knights?") && api('/api/staff/reset-hall');
+for (const b of document.querySelectorAll('[data-shot]')) b.onclick = () => api('/api/staff/camera', { shot: b.dataset.shot });
+window.addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'h' && e.target.tagName !== 'INPUT') $('hide').click(); });
+
+function connect() {
+  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+  ws.onmessage = (ev) => {
+    const { type, data } = JSON.parse(ev.data);
+    if (type === 'state') { S = data; render(); }
+    else if (!S) return;
+    else if (type === 'health') { S.health = data; render(); }
+    else if (type === 'result') { addTrace(data); fetch('/api/state').then((r) => r.json()).then((d) => { S = d; render(); }); }
+    else if (type === 'seal_pending') { S.sealPending = true; $('sealText').textContent = `“${data.dialogue}”`; render(); }
+    else if (type === 'seal_decided') { S.sealPending = false; render(); }
+    else if (type === 'bridge') { S.bridge = data.state; render(); }
+  };
+  ws.onclose = () => setTimeout(connect, 2000);
+}
+connect();
+</script>
+</body>
+</html>

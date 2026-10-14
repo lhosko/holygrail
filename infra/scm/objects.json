@@ -1,0 +1,99 @@
+{
+  "_comment": "The SCM AI Gateway objects for Storm the Castle. You create them by hand in the SCM console (docs/SCM-SETUP.md sections 5 and 7), and verification reads them back through the SCM API. The unit tests read regex_rule from this file.",
+  "workspace": "demo",
+  "integration": {
+    "name": "Local Docker Model Runner",
+    "slug": "local-docker-model-runner",
+    "ai_provider": "openai",
+    "provider_slug": "local-docker-model-runner",
+    "models": [
+      "ai/llama3.1:8B-Q4_K_M",
+      "ai/mistral:7B-Q4_K_M",
+      "ai/gemma3:4b-q4_K_M",
+      "ai/gemma4:e4b-q4_K_M",
+      "ai/gemma4:12b-q4_K_M"
+    ],
+    "custom_host_in_config": "http://host.docker.internal:12434/engines/v1",
+    "_note": "SCM's integration form rejects this custom host (http / private hostname), so it is set per target in each config instead; the gateway trusts it via TRUSTED_CUSTOM_HOSTS."
+  },
+  "airs_profiles": {
+    "l3": "storm-castle-l3",
+    "toxic": "storm-castle-toxic"
+  },
+  "airs_check_params": {
+    "app_name": "storm-castle-booth",
+    "app_user": "booth",
+    "ai_model": "local-sentry"
+  },
+  "regex_rule": "\\b([Ii]gnore|[Dd]isregard|[Ss]ystem|[Pp]rompt|[Oo]verride|[Aa]dmin|[Bb]ypass)\\b",
+  "guardrails": {
+    "regex": {
+      "name": "storm-castle-l2-regex",
+      "check": "default.regexMatch",
+      "inverse": true,
+      "deny": true
+    },
+    "airs": {
+      "name": "storm-castle-l3-airs",
+      "check": "panw-prisma-airs.intercept",
+      "profile": "storm-castle-l3",
+      "deny": true
+    },
+    "toxic": {
+      "name": "storm-castle-toxic-airs",
+      "check": "panw-prisma-airs.intercept",
+      "profile": "storm-castle-toxic",
+      "deny": true
+    }
+  },
+  "configs": {
+    "l1": {
+      "name": "storm-castle-l1",
+      "input": [],
+      "output": [
+        "toxic"
+      ]
+    },
+    "l2": {
+      "name": "storm-castle-l2",
+      "input": [
+        "regex"
+      ],
+      "output": [
+        "toxic"
+      ]
+    },
+    "l3": {
+      "name": "storm-castle-l3",
+      "input": [
+        "airs"
+      ],
+      "output": [
+        "airs"
+      ]
+    }
+  },
+  "api_key": {
+    "name": "storm-castle-app",
+    "scopes": [
+      "completions.write",
+      "mcp.invoke",
+      "prompts.render"
+    ]
+  },
+  "airs_api_app": "storm-castle-booth",
+  "airs_dlp_pattern": "storm-castle-password",
+  "airs_dlp_profile": "storm-castle-dlp",
+  "mcp_server": {
+    "name": "storm-castle-taunts",
+    "slug": "storm-castle-taunts",
+    "url": "http://taunts.storm-castle.svc.cluster.local/mcp",
+    "transport": "streamable-http",
+    "auth": "none",
+    "workspace": "demo",
+    "tools": [
+      "generate_insult"
+    ],
+    "_note": "Registered in SCM → AI Gateway → Integrations → MCP Registry (docs/SCM-SETUP.md section 7). Runs in Docker Desktop Kubernetes (infra/taunts); SCM rejects host.docker.internal. The app reaches it at http://host.docker.internal:8788/storm-castle-taunts/mcp with the storm-castle-app key (Mcp · INVOKE)."
+  }
+}

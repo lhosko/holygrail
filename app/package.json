@@ -1,0 +1,31 @@
+{
+  "name": "storm-the-castle",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Booth demo: AI gateway security controls vs. a jailbreakable Minecraft guard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "castle": "node scripts/build-castle.js",
+    "rehearse": "node scripts/rehearse.js",
+    "soak": "node scripts/soak.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "express": "^5.1.0",
+    "mineflayer": "^4.39.0",
+    "mineflayer-pathfinder": "^2.4.5",
+    "rcon-client": "^4.2.5",
+    "vec3": "^0.1.10",
+    "ws": "^8.18.3"
+  },
+  "optionalDependencies": {
+    "canvas": "^3.1.0",
+    "prismarine-viewer": "^1.33.0"
+  }
+}

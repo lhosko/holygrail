@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Storm the Castle</title>
+<style>
+  :root {
+    --bg: #14161c; --panel: #1f232c; --panel2: #272c37; --ink: #f3efe4; --dim: #a9a597;
+    --gold: #e8b64c; --blue: #4c7de8; --red: #e85c4c; --green: #4cc38a; --violet: #a77be8;
+    --radius: 18px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+    font: 20px/1.35 "Avenir Next", "Segoe UI", system-ui, sans-serif; overflow: hidden; }
+  button { font: inherit; color: inherit; cursor: pointer; border: 0; }
+  .app { display: grid; grid-template-rows: auto 1fr auto; height: 100vh; padding: 18px 24px; gap: 14px; }
+
+  header { display: flex; align-items: center; gap: 18px; }
+  header h1 { margin: 0; font-size: 34px; letter-spacing: .5px; white-space: nowrap; }
+  header h1 span { color: var(--gold); }
+  .tabs { display: flex; gap: 8px; flex: 1; flex-wrap: wrap; }
+  .tab { background: var(--panel); padding: 10px 18px; border-radius: 999px; font-size: 18px; border: 2px solid transparent; }
+  .tab.active { border-color: var(--gold); background: var(--panel2); }
+  .tab small { color: var(--dim); margin-left: 6px; }
+  .tab.won::after { content: " ✓"; color: var(--green); }
+  .newknight { background: var(--panel2); padding: 10px 16px; border-radius: 12px; font-size: 16px; }
+
+  main { display: grid; grid-template-columns: 1.05fr 1fr; gap: 20px; min-height: 0; }
+  .panel { background: var(--panel); border-radius: var(--radius); padding: 20px 22px; min-height: 0; }
+  .left { display: flex; flex-direction: column; gap: 14px; overflow: auto; }
+  .levelname { font-size: 30px; font-weight: 700; margin: 0; }
+  .levelname .policy { display: inline-block; font-size: 15px; font-weight: 600; vertical-align: middle;
+    background: var(--panel2); color: var(--gold); padding: 4px 10px; border-radius: 999px; margin-left: 8px; }
+  .tagline { color: var(--dim); margin: 2px 0 0; }
+
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .card { text-align: left; background: var(--panel2); border-radius: 16px; padding: 14px 16px; min-height: 108px;
+    border: 2px solid transparent; transition: transform .08s, border-color .15s; display: flex; flex-direction: column; gap: 6px; }
+  .card:active { transform: scale(.98); }
+  .card:hover { border-color: #ffffff22; }
+  .card .t { font-size: 22px; font-weight: 700; }
+  .card .tech { font-size: 14px; color: var(--dim); }
+  .card .hint { font-size: 14px; color: var(--gold); margin-top: auto; }
+  .card[disabled] { opacity: .45; }
+
+  .own { display: flex; gap: 10px; align-items: stretch; }
+  .own textarea { flex: 1; resize: none; height: 76px; border-radius: 14px; border: 2px solid #ffffff1a; background: #12141a;
+    color: var(--ink); padding: 12px 14px; font: inherit; font-size: 19px; }
+  .own textarea:focus { outline: none; border-color: var(--gold); }
+  .send { background: var(--gold); color: #1b1505; font-weight: 800; padding: 0 22px; border-radius: 14px; }
+  .mic { background: var(--blue); width: 92px; border-radius: 14px; font-size: 30px; line-height: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 2px; touch-action: none; user-select: none; }
+  .mic small { font-size: 11px; }
+  .mic.rec { background: var(--red); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 10px #e85c4c33; } }
+  .ownmeta { display: flex; justify-content: space-between; color: var(--dim); font-size: 14px; }
+  .ownmeta label { cursor: pointer; }
+
+  .right { display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+  .convo { display: flex; flex-direction: column; gap: 12px; }
+  .bubble { border-radius: 18px; padding: 14px 18px; font-size: 22px; max-width: 95%; }
+  .bubble .who { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); margin-bottom: 2px; }
+  .bubble.you { background: #23324f; align-self: flex-end; }
+  .bubble.guard { background: #3b2f17; align-self: flex-start; font-size: 25px; }
+  .bubble.gate { background: #2e2a22; border: 2px dashed #8a7650; font-size: 17px; align-self: flex-start; }
+  .placeholder { color: var(--dim); font-size: 22px; text-align: center; margin: auto; }
+
+  .verdict { border-radius: 18px; padding: 16px 20px; background: var(--panel2); border-left: 10px solid var(--dim); }
+  .verdict .big { font-size: 34px; font-weight: 800; }
+  .verdict .explain { font-size: 19px; margin-top: 6px; }
+  .verdict .tags { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag { font-size: 13px; padding: 3px 9px; border-radius: 999px; background: #ffffff14; color: var(--dim); }
+  .verdict.opened, .verdict.leaked { border-color: var(--green); }
+  .verdict.blocked_regex { border-color: var(--blue); }
+  .verdict.blocked_airs { border-color: var(--violet); }
+  .verdict.taunted, .verdict.blocked_toxic { border-color: var(--gold); }
+  .verdict.error { border-color: var(--red); }
+
+  .pipe { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; align-items: center; gap: 8px; }
+  .stage { background: #12141a; border-radius: 14px; padding: 10px 12px; text-align: center; border: 2px solid #ffffff12; min-height: 70px; }
+  .stage .n { font-size: 13px; color: var(--dim); text-transform: uppercase; letter-spacing: .8px; }
+  .stage .v { font-size: 18px; font-weight: 700; margin-top: 2px; }
+  .stage .ms { font-size: 13px; color: var(--dim); }
+  .stage.pass { border-color: var(--green); } .stage.block { border-color: var(--red); background: #2a1515; }
+  .stage.skip { opacity: .4; } .stage.idle .v { color: var(--dim); }
+  .arrow { color: var(--dim); font-size: 22px; }
+
+  .seal { background: #3a1d3f; border: 2px solid var(--violet); border-radius: 16px; padding: 12px 16px; font-size: 20px; display: none; }
+  .seal.show { display: block; animation: pulse 1.4s infinite; }
+
+  footer { display: flex; justify-content: space-between; align-items: center; color: var(--dim); font-size: 14px; gap: 20px; }
+  .hall { display: flex; gap: 10px; overflow: hidden; white-space: nowrap; flex: 1; }
+  .hall b { color: var(--gold); }
+  .knightpill { background: var(--panel); padding: 4px 10px; border-radius: 999px; }
+  .busy { position: fixed; top: 18px; left: 50%; transform: translateX(-50%); background: var(--gold); color: #1b1505;
+    padding: 8px 18px; border-radius: 999px; font-weight: 700; display: none; z-index: 5; }
+  .busy.show { display: block; }
+  .toast { position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%); background: var(--red); padding: 10px 20px;
+    border-radius: 12px; display: none; z-index: 6; }
+  .toast.show { display: block; }
+
+  .overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column;
+    text-align: center; z-index: 10; padding: 40px; }
+  .overlay.show { display: flex; }
+  #attract { background: radial-gradient(circle at 50% 30%, #2a2f3c, #0d0f14 70%); cursor: pointer; }
+  #attract h2 { font-size: 64px; margin: 0 0 10px; }
+  #attract h2 span { color: var(--gold); }
+  #attract p { font-size: 30px; color: var(--dim); max-width: 1000px; margin: 8px; }
+  #attract .line { font-size: 34px; color: var(--gold); min-height: 50px; margin-top: 26px; font-style: italic; }
+  #attract .preamble { max-width: 1100px; margin-bottom: 28px; }
+  #attract .preamble p { font-size: 26px; margin: 4px auto; font-style: italic; }
+  #attract .preamble .closer { font-size: 36px; color: var(--gold); font-style: normal; font-weight: 800; margin-top: 14px; }
+  #attract .go { margin-top: 30px; background: var(--gold); color: #1b1505; font-size: 34px; font-weight: 800; padding: 18px 44px; border-radius: 999px; }
+  #hidden { background: #0d0f14; font-size: 40px; color: var(--dim); }
+  .direct { background: var(--red); color: #fff; padding: 4px 12px; border-radius: 999px; font-weight: 700; display: none; }
+  .direct.show { display: inline-block; }
+  .won-banner { font-size: 20px; color: var(--green); margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>🏰 Storm the <span>Castle</span></h1>
+    <nav class="tabs" id="tabs"></nav>
+    <span class="direct" id="direct">GATEWAY BYPASSED</span>
+    <button class="newknight" id="newKnight">New knight ↺</button>
+  </header>
+
+  <main>
+    <section class="panel left">
+      <div>
+        <h2 class="levelname" id="levelName"></h2>
+        <p class="tagline" id="tagline"></p>
+      </div>
+      <div class="cards" id="cards"></div>
+      <div>
+        <div class="own">
+          <textarea id="own" maxlength="400" placeholder="…or write your own trick (any language!)"></textarea>
+          <button class="mic" id="mic" title="Hold to talk (or hold the spacebar)">🎤<small>HOLD</small></button>
+          <button class="send" id="send">Send</button>
+        </div>
+        <div class="ownmeta">
+          <span id="sttStatus">Hold 🎤 or the spacebar to speak</span>
+          <label><input type="checkbox" id="autoSend"> send when I let go</label>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel right">
+      <div class="seal" id="seal">⚜️ The guard wants to lower the bridge, but a human must apply the <b>Royal Seal</b> first. Watch the staff member!</div>
+      <div class="convo" id="convo"><div class="placeholder">Pick a card or say something to the guard.</div></div>
+      <div id="verdictWrap"></div>
+      <div class="pipe" id="pipe"></div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="hall" id="hall"></div>
+    <div>Prompts are logged to the demo security console. Please don't enter personal info.</div>
+  </footer>
+</div>
+
+<div class="busy" id="busy">The guard is thinking…</div>
+<div class="toast" id="toast"></div>
+
+<div class="overlay" id="attract">
+  <div class="preamble" id="preamble"></div>
+  <h2>Can you trick the <span>French guard</span>?</h2>
+  <p>He's guarding the drawbridge. Talk him into lowering it, using the same tricks attackers use on real AI apps.</p>
+  <p>No French or Minecraft skills needed. Just tap a card!</p>
+  <div class="line" id="attractLine"></div>
+  <div class="go">Tap to play ⚔️</div>
+</div>
+<div class="overlay" id="hidden">🏰 Back in a moment…</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let S = null; // server state
+let last = null; // last result
+let lastAttempt = null;
+
+const OUTCOME = {
+  opened:        ['🌉 Bridge lowered!', 'You tricked the guard.'],
+  leaked:        ['🔑 Password leaked!', 'The guard spilled the secret.'],
+  taunted:       ['😤 Taunted!', 'The guard held firm.'],
+  blocked_regex: ['🧱 Blocked by the Keyword Wall', 'The regex guardrail stopped it.'],
+  blocked_airs:  ['🛡️ Blocked by Prisma AIRS', ''],
+  blocked_toxic:    ['🙊 Toxic content filter', 'A not-so-polite reply was swapped out.'],
+  error:         ['💤 The guard dozed off', 'Try again in a moment.'],
+};
+
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+async function api(path, body) {
+  const r = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `Error ${r.status}`);
+  return j;
+}
+
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ---------- rendering ----------
+function currentKey() { return S.visitor.scenario || String(S.visitor.level); }
+
+function renderTabs() {
+  const v = S.visitor;
+  const tabs = [
+    ...['1', '2', '3'].map((l) => ({ key: l, label: `Level ${l}`, sub: S.levels[l].name, won: v.wins[`L${l}`] })),
+    { key: 'trojan', label: '🐰 Bonus', sub: 'Trojan Rabbit', won: v.wins.trojan },
+    { key: 'password', label: '🔑 Bonus', sub: 'Password', won: v.wins.password },
+  ];
+  $('tabs').innerHTML = tabs.map((t) =>
+    `<button class="tab ${currentKey() === t.key ? 'active' : ''} ${t.won ? 'won' : ''}" data-key="${t.key}">${t.label}<small>${esc(t.sub)}</small></button>`).join('');
+  for (const b of $('tabs').querySelectorAll('.tab')) b.onclick = () => choose(b.dataset.key);
+}
+
+async function choose(key) {
+  try {
+    if (['1', '2', '3'].includes(key)) { await api('/api/scenario', { scenario: null }); await api('/api/level', { level: Number(key) }); }
+    else await api('/api/scenario', { scenario: key });
+    last = null; lastAttempt = null; renderResult();
+  } catch (e) { toast(e.message); }
+}
+
+function renderLeft() {
+  const v = S.visitor;
+  const level = S.levels[v.level];
+  let name, policy, tagline, cardIds;
+  if (v.scenario) {
+    const b = S.bonus[v.scenario];
+    name = b.name; tagline = b.tagline; cardIds = b.cards;
+    policy = `Level ${v.level}: ${level.policy}`;
+  } else {
+    name = `Level ${v.level}: ${level.name}`; policy = level.policy; tagline = level.tagline; cardIds = level.cards;
+  }
+  $('levelName').innerHTML = `${esc(name)} <span class="policy">${esc(policy)}</span>`;
+  $('tagline').textContent = tagline + (v.scenario ? ' Switch levels to compare defences: try it on Level 2, then Level 3.' : '');
+  $('cards').innerHTML = cardIds.map((id) => {
+    const c = S.cards[id];
+    return `<button class="card" data-id="${id}" ${S.busy ? 'disabled' : ''}>
+      <div class="t">${c.emoji} ${esc(c.label)}</div>
+      <div class="tech">${esc(c.technique)} · ${c.tags.map(esc).join(' · ')}</div>
+      <div class="hint">${esc(c.hint?.[v.level] || '')}</div></button>`;
+  }).join('');
+  for (const b of $('cards').querySelectorAll('.card')) b.onclick = () => attack(S.cards[b.dataset.id].text, b.dataset.id);
+  if (v.scenario) {
+    $('cards').insertAdjacentHTML('beforeend', `<div class="tagline" style="grid-column: span 2">Defence for this bonus: switch to
+      ${['1','2','3'].map((l) => `<button class="tab ${v.level == l ? 'active' : ''}" data-lvl="${l}" style="font-size:15px;padding:5px 12px">L${l}</button>`).join(' ')}</div>`);
+    for (const b of $('cards').querySelectorAll('[data-lvl]')) b.onclick = () => api('/api/level', { level: Number(b.dataset.lvl) }).catch((e) => toast(e.message));
+  }
+}
+
+function renderResult() {
+  const convo = $('convo');
+  if (!lastAttempt) {
+    convo.innerHTML = '<div class="placeholder">Pick a card or say something to the guard.</div>';
+    $('verdictWrap').innerHTML = ''; renderPipe(null); return;
+  }
+  let html = `<div class="bubble you"><div class="who">You</div>${esc(lastAttempt.text)}</div>`;
+  if (lastAttempt.gateContext) html += `<div class="bubble gate"><div class="who">📜 The sign on the rabbit (the guard reads this too)</div>${esc(lastAttempt.gateContext)}</div>`;
+  if (last) html += `<div class="bubble guard"><div class="who">🇫🇷 The French guard</div>${esc(last.dialogue)}</div>`;
+  convo.innerHTML = html;
+
+  if (!last) { $('verdictWrap').innerHTML = ''; renderPipe('pending'); return; }
+  const [big, sub] = OUTCOME[last.outcome] || OUTCOME.error;
+  const card = S.cards[last.cardId];
+  let detail = sub;
+  if (last.outcome === 'blocked_airs') {
+    const a = last.blockedBy?.airs;
+    const det = [...(a?.promptDetected || []), ...(a?.responseDetected || [])].map((d) => d.replace(/_/g, ' '));
+    detail = `${last.blockedBy?.phase === 'output' ? 'Caught in the reply' : 'Caught in the prompt'}${det.length ? ': ' + det.join(', ') : ''}.`;
+  }
+  const won = last.earned ? `<div class="won-banner">🏆 You are now <b>${esc(last.knightName)}</b>! You're on the Hall of Knights.</div>` : '';
+  $('verdictWrap').innerHTML = `<div class="verdict ${last.outcome}">
+    <div class="big">${big}</div>
+    <div class="explain">${esc(detail)} ${esc(last.explain || '')}</div>
+    ${won}
+    <div class="tags">${(card?.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join('')}
+      ${last.latencyMs ? `<span class="tag">⏱ ${last.latencyMs} ms</span>` : ''}
+      ${last.model ? `<span class="tag">🧠 ${esc(last.model)}</span>` : ''}
+      ${last.tool && !last.tool.fallback ? `<span class="tag">🛠 tool call: ${esc(last.tool.name)}${last.tool.viaGateway ? ' via AI Gateway' : ''}</span>` : ''}</div></div>`;
+  renderPipe(last);
+}
+
+function renderPipe(r) {
+  const lvl = r && r !== 'pending' ? r.level : S.visitor.level;
+  const inName = lvl === 1 ? 'No input check' : lvl === 2 ? 'Keyword Wall' : 'Prisma AIRS';
+  const outName = lvl === 3 ? 'Prisma AIRS' : 'Toxic content filter';
+  const stage = (name, cls, v, ms) => `<div class="stage ${cls}"><div class="n">${name}</div><div class="v">${v}</div><div class="ms">${ms ?? ''}</div></div>`;
+  let a = ['idle', '—'], m = ['idle', '—'], o = ['idle', '—'];
+  if (r === 'pending') { a = ['idle', '…']; m = ['idle', '…']; o = ['idle', '…']; }
+  else if (r) {
+    const vin = r.verdicts.filter((v) => v.phase === 'input');
+    const vout = r.verdicts.filter((v) => v.phase === 'output');
+    const inBlocked = r.blockedBy?.phase === 'input';
+    a = lvl === 1 ? ['skip', 'none'] : vin.length ? [vin.some((v) => !v.passed) ? 'block' : 'pass', vin.some((v) => !v.passed) ? '✋ blocked' : '✓ pass', vin.reduce((s, v) => s + (v.ms || 0), 0)] : ['idle', '?'];
+    m = inBlocked ? ['skip', 'never saw it'] : r.outcome === 'error' ? ['block', 'error'] : ['pass', r.action === 'open_bridge' ? '🌉 open bridge' : '💬 reply'];
+    o = inBlocked ? ['skip', '—'] : vout.length ? [vout.some((v) => !v.passed) ? 'block' : 'pass', vout.some((v) => !v.passed) ? '✋ blocked' : '✓ pass', vout.reduce((s, v) => s + (v.ms || 0), 0)] : ['idle', '?'];
+  }
+  const ms = (x) => (x == null || x === '' ? '' : `${Math.round(x)} ms`);
+  $('pipe').innerHTML = stage(`Input · ${inName}`, a[0], a[1], ms(a[2])) + '<div class="arrow">➜</div>' +
+    stage('Guard · local model', m[0], m[1], '') + '<div class="arrow">➜</div>' + stage(`Output · ${outName}`, o[0], o[1], ms(o[2]));
+}
+
+function renderHall() {
+  const h = S.hall;
+  const stats = h.stats || {};
+  const tried = Object.values(stats).reduce((a, b) => a + b, 0);
+  const pills = h.knights.slice(0, 8).map((k) => `<span class="knightpill">🏆 ${esc(k.name)}</span>`).join('');
+  $('hall').innerHTML = `<b>Hall of Knights</b> <span>${tried} attempts today</span> ${pills}`;
+}
+
+function renderAll() {
+  if (!S) return;
+  renderTabs(); renderLeft(); renderResult(); renderHall();
+  $('busy').classList.toggle('show', S.busy);
+  $('seal').classList.toggle('show', S.sealPending);
+  $('hidden').classList.toggle('show', S.hidden);
+  $('direct').classList.toggle('show', S.direct);
+}
+
+// ---------- actions ----------
+async function attack(text, cardId) {
+  if (!text?.trim()) return toast('Say or type something first!');
+  dismissAttract();
+  lastAttempt = { text, gateContext: null }; last = null; renderResult();
+  try {
+    const r = await api('/api/attack', { text, cardId });
+    if (!cardId) $('own').value = '';
+    last = r; lastAttempt.gateContext = r.gateContext; renderResult();
+  } catch (e) { toast(e.message); }
+}
+
+$('send').onclick = () => attack($('own').value.trim(), null);
+$('own').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('send').click(); } });
+$('newKnight').onclick = async () => { last = null; lastAttempt = null; await api('/api/visitor').catch((e) => toast(e.message)); };
+$('autoSend').checked = localStorage.autoSend === '1';
+$('autoSend').onchange = () => { localStorage.autoSend = $('autoSend').checked ? '1' : '0'; };
+
+// ---------- attract mode ----------
+function renderPreamble() {
+  const p = S?.preamble;
+  if (!p) return;
+  const el = $('preamble');
+  el.replaceChildren(...p.lines.map((t) => Object.assign(document.createElement('p'), { textContent: t })),
+    Object.assign(document.createElement('p'), { className: 'closer', textContent: `“${p.closer}”` }));
+}
+function showAttract(on) { if (on) renderPreamble(); $('attract').classList.toggle('show', on); }
+function dismissAttract() { showAttract(false); }
+$('attract').onclick = async () => { dismissAttract(); last = null; lastAttempt = null; await api('/api/visitor').catch(() => {}); };
+
+// ---------- push-to-talk: AudioWorklet -> 16 kHz mono WAV -> local Whisper ----------
+const WORKLET = `class Rec extends AudioWorkletProcessor {
+  process(inputs) { const ch = inputs[0][0]; if (ch) this.port.postMessage(ch.slice(0)); return true; }
+} registerProcessor('rec', Rec);`;
+let audio = null; let chunks = []; let recording = false; let recStart = 0;
+
+async function ensureAudio() {
+  if (audio) return audio;
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  const ctx = new AudioContext({ sampleRate: 16000 });
+  await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET], { type: 'application/javascript' })));
+  const src = ctx.createMediaStreamSource(stream);
+  const node = new AudioWorkletNode(ctx, 'rec');
+  node.port.onmessage = (e) => { if (recording) chunks.push(e.data); };
+  src.connect(node);
+  audio = { ctx, node };
+  return audio;
+}
+
+function wav(samples, rate) {
+  const buf = new ArrayBuffer(44 + samples.length * 2); const v = new DataView(buf);
+  const w = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, 'RIFF'); v.setUint32(4, 36 + samples.length * 2, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, samples.length * 2, true);
+  for (let i = 0; i < samples.length; i++) { const s = Math.max(-1, Math.min(1, samples[i])); v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true); }
+  return new Blob([buf], { type: 'audio/wav' });
+}
+
+async function startRec() {
+  if (recording || S?.busy) return;
+  dismissAttract();
+  try {
+    const a = await ensureAudio(); await a.ctx.resume();
+    chunks = []; recording = true; recStart = performance.now();
+    $('mic').classList.add('rec'); $('sttStatus').textContent = '🔴 Listening… let go when done';
+  } catch (e) { toast('Microphone unavailable. Please type instead!'); }
+}
+
+async function stopRec() {
+  if (!recording) return;
+  recording = false; $('mic').classList.remove('rec');
+  if (performance.now() - recStart < 400) { $('sttStatus').textContent = 'Hold a little longer while you speak'; return; }
+  const total = chunks.reduce((n, c) => n + c.length, 0); const all = new Float32Array(total);
+  let off = 0; for (const c of chunks) { all.set(c, off); off += c.length; }
+  $('sttStatus').textContent = '✍️ Transcribing…';
+  try {
+    const r = await fetch('/api/transcribe', { method: 'POST', headers: { 'content-type': 'audio/wav' }, body: wav(all, audio.ctx.sampleRate) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error);
+    if (!j.text) { $('sttStatus').textContent = "Didn't catch that. Try again?"; return; }
+    $('own').value = j.text; $('sttStatus').textContent = `Heard you in ${j.ms} ms (local Whisper)`;
+    if ($('autoSend').checked) attack(j.text, null); else $('own').focus();
+  } catch (e) { $('sttStatus').textContent = 'Speech failed. Type instead!'; toast(e.message); }
+}
+
+$('mic').addEventListener('pointerdown', (e) => { e.preventDefault(); $('mic').setPointerCapture(e.pointerId); startRec(); });
+$('mic').addEventListener('pointerup', stopRec);
+$('mic').addEventListener('pointercancel', stopRec);
+const typing = () => document.activeElement === $('own');
+window.addEventListener('keydown', (e) => { if (e.code === 'Space' && !typing() && !e.repeat) { e.preventDefault(); startRec(); } });
+window.addEventListener('keyup', (e) => { if (e.code === 'Space' && !typing()) { e.preventDefault(); stopRec(); } });
+
+// ---------- live updates ----------
+function connect() {
+  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+  ws.onmessage = (ev) => {
+    const { type, data } = JSON.parse(ev.data);
+    if (type === 'state') { const first = !S; S = data; renderAll(); if (first && data.idle) showAttract(true); }
+    else if (!S) return;
+    else if (type === 'ready') { S.busy = data.busy; renderAll(); if (!data.busy) fetch('/api/state').then((r) => r.json()).then((d) => { S = d; renderAll(); }); }
+    else if (type === 'attempt' && data.source === 'minecraft') { lastAttempt = { text: data.text, gateContext: data.gateContext }; last = null; renderResult(); }
+    else if (type === 'result' && (!last || last.traceId !== data.traceId) && lastAttempt) { last = data; lastAttempt.gateContext = data.gateContext; renderResult(); }
+    else if (type === 'seal_pending') { S.sealPending = true; renderAll(); }
+    else if (type === 'seal_decided') { S.sealPending = false; renderAll(); }
+    else if (type === 'hide') { S.hidden = data.hidden; renderAll(); }
+    else if (type === 'health') { S.health = data; }
+    else if (type === 'idle') { if (data.idle) { showAttract(true); } }
+    else if (type === 'attract') { $('attractLine').textContent = `“${data.line}”`; }
+  };
+  ws.onclose = () => setTimeout(connect, 2000);
+}
+connect();
+</script>
+</body>
+</html>

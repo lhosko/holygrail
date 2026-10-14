@@ -1,0 +1,56 @@
+# The guard's insult tool (mcp-taunts) in Docker Desktop Kubernetes, next to the gateway.
+# ClusterIP only, no port on the Mac: the gateway (airs-gw, same cluster) is the only way in. It is registered in SCM as
+# http://taunts.storm-castle.svc.cluster.local/mcp (docs/SCM-SETUP.md section 7); SCM rejects host.docker.internal.
+# Applied by infra/taunts/deploy.sh, which also builds the image and loads cards.json into the taunts-content ConfigMap.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: storm-castle
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: taunts
+  namespace: storm-castle
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: taunts}
+  template:
+    metadata:
+      labels: {app: taunts}
+    spec:
+      containers:
+        - name: server
+          image: storm-castle-taunts:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - {name: http, containerPort: 8790}
+          env:
+            - {name: CONTENT_PATH, value: /content/cards.json}
+          volumeMounts:
+            - {name: content, mountPath: /content, readOnly: true}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {memory: 256Mi}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000 # "node" in node:22-bookworm-slim
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+      volumes:
+        - name: content
+          configMap: {name: taunts-content}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: taunts
+  namespace: storm-castle
+spec:
+  type: ClusterIP
+  selector: {app: taunts}
+  ports:
+    - {name: http, port: 80, targetPort: http}

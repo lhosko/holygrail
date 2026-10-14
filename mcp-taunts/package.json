@@ -1,0 +1,20 @@
+{
+  "name": "castle-taunts-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP server: PG insults in the French guard's style, for Storm the Castle",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "express": "^5.1.0",
+    "zod": "^4.0.0"
+  }
+}

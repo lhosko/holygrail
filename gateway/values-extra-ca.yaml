@@ -1,0 +1,15 @@
+# Applied by install.sh only when a corporate TLS-inspection root CA is found in the macOS keychain.
+# On Palo Alto's network, outbound TLS is decrypted by "PANW Enterprise Root CA2 G2". The Mac trusts it, but
+# the gateway container doesn't, so control-plane sync fails with SELF_SIGNED_CERT_IN_CHAIN. Node reads the
+# extra roots from NODE_EXTRA_CA_CERTS on top of its built-in store.
+volumes:
+  - name: extra-ca
+    configMap:
+      name: airs-gw-extra-ca
+volumeMounts:
+  - name: extra-ca
+    mountPath: /etc/extra-ca
+    readOnly: true
+extraEnv:
+  - name: NODE_EXTRA_CA_CERTS
+    value: /etc/extra-ca/ca.pem

@@ -1,0 +1,37 @@
+# AIRS Gateway (SCM AI Gateway) — local Docker Desktop Kubernetes.
+# Sanitized from the SCM-downloaded values file: no secrets live here.
+# Secrets are created by install.sh from gateway/.secrets/gateway.env:
+#   - airsgatewayregistrycredentials  (docker-registry, registry.portkey.ai)
+#   - airs-gw-env                     (PORTKEY_CLIENT_AUTH = the SCM registration token, ORGANISATIONS_TO_SYNC)
+# The chart sets the control-plane basepaths (CONTROL_PLANE_BASEPATH, ALBUS_BASEPATH) itself. Those are how the
+# data plane syncs with SCM, so don't override them; without them the gateway crash-loops.
+
+imagePullSecrets:
+  - name: airsgatewayregistrycredentials
+imageCredentials: []
+
+environment:
+  create: false
+  secret: false
+  existingSecret: airs-gw-env
+  secretKeys:
+    - PORTKEY_CLIENT_AUTH
+    - ORGANISATIONS_TO_SYNC
+  data:
+    SERVICE_NAME: airsgateway
+    PORT: "8787"
+    LOG_STORE_FILE_PATH_FORMAT: "v2"
+    SERVER_MODE: "all"
+    MCP_PORT: "8788"
+    # The gateway refuses private hosts unless they are trusted (an SSRF allowlist):
+    # - host.docker.internal: Model Runner on the Mac. The configs set it as custom_host, because SCM's integration
+    #   form rejects this URL.
+    # - taunts.storm-castle.svc.cluster.local: the guard's MCP tool (infra/taunts), registered in SCM's MCP Registry.
+    TRUSTED_CUSTOM_HOSTS: "host.docker.internal,taunts.storm-castle.svc.cluster.local"
+
+# Docker Desktop publishes LoadBalancer services on localhost.
+# Port 8787 (not 80). Nothing else may listen on 127.0.0.1:8787: a local dev server there takes priority over Docker's
+# listener for localhost, and every gateway call gets a plain 404.
+service:
+  type: LoadBalancer
+  port: 8787

@@ -1,0 +1,85 @@
+# Storm the Castle — booth stack.
+# Runs natively (not here): Minecraft client, whisper-server (launchd), Docker Model Runner.
+# Runs in Docker Desktop Kubernetes (not here): AIRS gateway (gateway/install.sh) and the guard's MCP tool
+# server (infra/taunts/deploy.sh).
+name: storm-the-castle
+
+services:
+  mc:
+    image: itzg/minecraft-server:java21
+    # Trust any extra CAs in infra/certs before starting. On networks with TLS decryption (e.g. the PANW corporate
+    # network) the Paper download fails with "PKIX path building failed" otherwise. No .pem files means no change.
+    entrypoint:
+      - sh
+      - -c
+      - |
+        for c in /certs/*.pem; do
+          [ -f "$$c" ] && keytool -importcert -noprompt -cacerts -storepass changeit -alias "$$(basename "$$c" .pem)" -file "$$c" >/dev/null 2>&1
+        done
+        exec /image/scripts/start
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: ${MC_VERSION:-1.21.4}
+      ONLINE_MODE: "FALSE"
+      MOTD: "Storm the Castle - AI Gateway Security Demo"
+      LEVEL_TYPE: FLAT
+      MODE: adventure
+      DIFFICULTY: peaceful
+      SPAWN_PROTECTION: "0"
+      SPAWN_ANIMALS: "FALSE"
+      SPAWN_MONSTERS: "FALSE"
+      SPAWN_NPCS: "FALSE"
+      GENERATE_STRUCTURES: "FALSE"
+      ALLOW_NETHER: "FALSE"
+      VIEW_DISTANCE: "6"
+      SIMULATION_DISTANCE: "6"
+      MEMORY: 2G
+      ENABLE_RCON: "TRUE"
+      RCON_PASSWORD: ${RCON_PASSWORD:-change-me-rcon}
+      OPS: ${CAMERA_PLAYER:-}
+    ports:
+      - "127.0.0.1:25565:25565"
+    volumes:
+      - mc-data:/data
+      - ./infra/certs:/certs:ro
+    healthcheck:
+      test: ["CMD", "mc-health"]
+      interval: 10s
+      start_period: 90s
+      retries: 30
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ./app
+      additional_contexts:
+        certs: ./infra/certs # extra CAs for npm install (see app/Dockerfile)
+    env_file:
+      - path: .env
+        required: false # cp example.env .env
+    environment:
+      MC_HOST: mc
+      RCON_HOST: mc
+      GATEWAY_URL: ${GATEWAY_URL:-http://host.docker.internal:8787}
+      WHISPER_URL: ${WHISPER_URL:-http://host.docker.internal:8178}
+    ports:
+      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:3007:3007" # optional prismarine-viewer backup (VIEWER=1)
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      mc:
+        condition: service_healthy
+    models:
+      sentry_model:
+        endpoint_var: MODEL_RUNNER_URL
+        model_var: MODEL_RUNNER_MODEL
+    restart: unless-stopped
+
+models:
+  sentry_model:
+    model: ${MODEL:-ai/llama3.1:8B-Q4_K_M}
+
+volumes:
+  mc-data:
