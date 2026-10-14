@@ -37,16 +37,17 @@ All paths start from **AI Security** in the SCM left nav. AI Gateway pages have 
 
 ---
 
-## Onboarding a colleague (3 min each)
-Colleagues share this tenant's `demo` workspace and everything in §2, §5 and §7. Each one gets their own gateway registration and service key, so you can revoke them one at a time. They then follow [QUICKSTART](QUICKSTART.md).
-1. **Their own hybrid deployment.** AI Security → Home → AI Gateway tile → **Deploy Hybrid** → name it `lappy-<colleague>` → workspace `demo` → **Download values.yaml** → **Done** → **Commit**.
-   - Use a new name each time. Re-running an existing deployment invalidates its token, including yours.
-2. **Their own service key.** AI Gateway → Security Keys → Gateway API Keys → Service → **Create New** `storm-castle-<colleague>`, with the same permissions as `storm-castle-app` (Completions · WRITE, Mcp · INVOKE, Prompts · RENDER).
-3. **Bundle:** `scripts/make-bundle.sh <colleague> ~/Downloads/<values>.yaml`. Paste the key when prompted.
-   - It reads the shared config/guardrail IDs from your `.env` and `AIRS_API_KEY` from `gateway/.secrets/gateway.env`. Set `GATEWAY_ENV_FILE=…` if yours lives elsewhere.
-   - It writes `storm-castle-<colleague>.env`, which is gitignored. Send it over a secure channel (not plain Slack or email), then delete your copy.
+## Onboarding a colleague (2 min each)
+Colleagues share this tenant's `demo` workspace and everything in §2, §5 and §7. Each one registers their own gateway (Deploy Hybrid, `lappy-<name>`) as step 1 of [QUICKSTART](QUICKSTART.md), so you can see and remove them one at a time.
+1. **Give them access** to `lhoskinson-us` with a role that can deploy an AI Gateway.
+2. **Email them the two keys** that `setup.sh` asks for. Copy each to the clipboard without showing it on screen:
+   - AIRS API key: `grep '^AIRS_API_KEY=' ~/projects/lappy/ai-gateway/.secrets/gateway.env | cut -d= -f2- | tr -d '\n' | pbcopy`
+   - Gateway service key (`storm-castle-app`): `grep '^GATEWAY_API_KEY=' ~/projects/minecraft/.env | cut -d= -f2- | tr -d '\n' | pbcopy`
+   - Everyone shares these keys, so revoking one cuts off everybody, you included. Rotate them if they leak.
 
-Offboarding: delete their service key and their hybrid deployment.
+The config and guardrail IDs aren't secret; they're in `example.env`.
+
+Offboarding: delete their `lappy-<name>` hybrid deployment and remove their tenant access.
 
 Every colleague's AIRS checks run against this tenant's quota (about 2 scans per Level 3 attempt).
 

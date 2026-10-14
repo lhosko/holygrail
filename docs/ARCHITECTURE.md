@@ -54,7 +54,7 @@
 ## Files
 | Path | What |
 |---|---|
-| `setup.sh` / `teardown.sh` | one-command colleague setup from a bundle (`scripts/make-bundle.sh`), and removal |
+| `setup.sh` / `teardown.sh` | one-command setup from the SCM Deploy Hybrid values.yaml (`scripts/scm-values.py` parses it), and removal |
 | `gateway/` | sanitized Helm values + `install.sh` (pinned to `docker-desktop`); secrets in `gateway/.secrets/` (gitignored) |
 | `infra/scm/objects.json` | the SCM AI Gateway objects you create in the console (integration, guardrails, 3 configs, service key, MCP server); verification and tests read it |
 | `docker-compose.yml` | `mc`, `app`, DMR model |

@@ -5,3 +5,4 @@ data/
 .DS_Store
 storm-castle-*.env
 gateway/.secrets/
+.env.tmp

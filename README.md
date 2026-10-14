@@ -15,11 +15,11 @@ There are also two bonus scenarios: indirect injection (Trojan Rabbit) and data 
 - [Booth playbook](docs/BOOTH-PLAYBOOK.md)
 
 ## Run it on your Mac
-Have Docker Desktop with Kubernetes enabled, plus the bundle file the demo owner sent you, then:
+Register your own gateway in SCM tenant `lhoskinson-us` (Deploy Hybrid), then with Docker Desktop + Kubernetes enabled:
 ```bash
-./setup.sh ~/Downloads/storm-castle-<you>.env
+./setup.sh ~/Downloads/<values.yaml from Deploy Hybrid>
 ```
-Details and troubleshooting are in **[QUICKSTART](docs/QUICKSTART.md)**. If you're the owner onboarding someone, see [SCM-SETUP → Onboarding a colleague](docs/SCM-SETUP.md#onboarding-a-colleague-3-min-each).
+Details and troubleshooting are in **[QUICKSTART](docs/QUICKSTART.md)**. If you're the owner onboarding someone, see [SCM-SETUP → Onboarding a colleague](docs/SCM-SETUP.md#onboarding-a-colleague-2-min-each).
 
 ## Owner setup (new tenant, by hand)
 This is what `setup.sh` automates, plus the SCM console work it depends on.

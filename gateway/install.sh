@@ -6,7 +6,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 CTX="docker-desktop"
 NS="airs-gw"
-ENV_FILE="${GATEWAY_ENV_FILE:-$ROOT/.secrets/gateway.env}"  # setup.sh writes this from your bundle
+ENV_FILE="${GATEWAY_ENV_FILE:-$ROOT/.secrets/gateway.env}"  # setup.sh writes this from your SCM values.yaml
 K="kubectl --context $CTX"
 
 if ! kubectl config get-contexts -o name | grep -qx "$CTX"; then

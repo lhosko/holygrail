@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # One-command setup for Storm the Castle on a Mac with Docker Desktop (docs/QUICKSTART.md).
 #
-#   ./setup.sh <storm-castle-you.env>   first run: the bundle the demo owner sent you
-#   ./setup.sh                          re-run: keeps your .env and gateway secrets
-#   flags: --force (rewrite .env from the bundle)  --whisper (voice input)  --no-smoke (skip the AIRS smoke test)
+#   ./setup.sh <values.yaml>   first run: the file SCM gave you at Deploy Hybrid. Asks for the two keys the demo
+#                              owner emailed you (input hidden) and your Minecraft username.
+#   ./setup.sh                 re-run: keeps your .env and gateway secrets
+#   flags: --force (rewrite .env and gateway.env)  --whisper (voice input)  --no-smoke (skip the AIRS smoke test)
 #
 # Safe to re-run: every step checks first. Kubernetes work is pinned to the docker-desktop context.
 set -euo pipefail
@@ -14,15 +15,15 @@ CTX="docker-desktop"
 GW_ENV="$ROOT/gateway/.secrets/gateway.env"
 GATEWAY_IMAGE="registry.portkey.ai/airsgw/gateway_enterprise:2.21.0" # matches chart airs-gw 1.2.0 in gateway/install.sh
 
-BUNDLE=""; FORCE=0; WHISPER=0; SMOKE=1
+VALUES=""; FORCE=0; WHISPER=0; SMOKE=1
 for a in "$@"; do
   case "$a" in
     --force) FORCE=1 ;;
     --whisper) WHISPER=1 ;;
     --no-smoke) SMOKE=0 ;;
-    -h|--help) sed -n '2,8p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,9p' "$0"; exit 0 ;;
     -*) echo "Unknown flag $a" >&2; exit 1 ;;
-    *) BUNDLE="$a" ;;
+    *) VALUES="$a" ;;
   esac
 done
 
@@ -81,47 +82,42 @@ ok "kubectl, helm, python3"
 
 # ---------------------------------------------------------------------------------------------------------------------
 step "Secrets"
-if [[ -n "$BUNDLE" ]]; then
-  [[ -f "$BUNDLE" ]] || die "Can't find bundle file $BUNDLE"
-  for k in REGISTRY_USERNAME REGISTRY_PASSWORD PORTKEY_CLIENT_AUTH ORGANISATIONS_TO_SYNC GATEWAY_API_KEY CONFIG_L1; do
-    [[ -n "$(envval "$k" "$BUNDLE")" ]] || die "The bundle has no $k. Ask the demo owner for a fresh one."
-  done
+# Gateway registration: from the values.yaml SCM gives you at Deploy Hybrid, plus the shared AIRS key.
+if [[ -n "$VALUES" ]]; then
+  [[ -f "$VALUES" ]] || die "Can't find $VALUES"
+  if [[ ! -f "$GW_ENV" || $FORCE -eq 1 || "$VALUES" -nt "$GW_ENV" ]]; then
+    gw="$(python3 scripts/scm-values.py "$VALUES")" || die "Couldn't read the gateway registration from $VALUES."
+    airs="$(envval AIRS_API_KEY "$GW_ENV")"
+    while [[ -z "$airs" ]]; do read -r -s -p "    AIRS API key (from the demo owner's email, input hidden): " airs; echo; done
+    mkdir -p "$(dirname "$GW_ENV")"; chmod 700 "$(dirname "$GW_ENV")"
+    ( umask 077; printf '%s\nAIRS_API_KEY=%s\n' "$gw" "$airs" > "$GW_ENV" )
+    ok "Wrote gateway/.secrets/gateway.env"
+  fi
 fi
-
-if [[ -n "$BUNDLE" && ( ! -f "$GW_ENV" || $FORCE -eq 1 || "$BUNDLE" -nt "$GW_ENV" ) ]]; then
-  mkdir -p "$(dirname "$GW_ENV")"; chmod 700 "$(dirname "$GW_ENV")"
-  ( umask 077; for k in REGISTRY_USERNAME REGISTRY_PASSWORD PORTKEY_CLIENT_AUTH ORGANISATIONS_TO_SYNC AIRS_API_KEY; do
-      echo "$k=$(envval "$k" "$BUNDLE")"; done > "$GW_ENV" )
-  ok "Wrote gateway/.secrets/gateway.env"
-fi
-[[ -f "$GW_ENV" ]] || die "No gateway secrets yet. Run: ./setup.sh <the storm-castle-*.env file the demo owner sent you>"
+[[ -f "$GW_ENV" ]] || die "No gateway registration yet. Run: ./setup.sh <the values.yaml you downloaded from SCM Deploy Hybrid>"
 
 if [[ ! -f .env || $FORCE -eq 1 ]]; then
-  [[ -n "$BUNDLE" ]] || die "No .env yet. Run: ./setup.sh <the storm-castle-*.env file the demo owner sent you>"
+  key="$(envval GATEWAY_API_KEY .env)"
+  while [[ -z "$key" ]]; do read -r -s -p "    Gateway service key (from the demo owner's email, input hidden): " key; echo; done
   player="$(envval CAMERA_PLAYER .env)"
   while [[ -z "$player" ]]; do read -r -p "    Your Minecraft Java username (the TV camera player): " player; done
   pin="$(printf '%04d' $((RANDOM % 10000)))"
+  # Values go in through the environment so the key never shows up in `ps`.
   ( umask 077
-    python3 - "$BUNDLE" "$player" "$(openssl rand -hex 16)" "$pin" > .env <<'PY'
-import re, sys
-bundle, player, rcon, pin = sys.argv[1:]
-vals = {}
-for line in open(bundle):
-    m = re.match(r'^([A-Z0-9_]+)=(.*)$', line.rstrip('\n'))
-    if m: vals[m.group(1)] = m.group(2)
-app = {k: vals.get(k, '') for k in ['GATEWAY_API_KEY', 'CONFIG_L1', 'CONFIG_L2', 'CONFIG_L3',
-                                    'GUARDRAIL_TOXIC_ID', 'GUARDRAIL_REGEX_ID', 'GUARDRAIL_AIRS_ID']}
-app.update(CAMERA_PLAYER=player, RCON_PASSWORD=rcon, STAFF_PIN=pin)
+    SC_KEY="$key" SC_PLAYER="$player" SC_RCON="$(openssl rand -hex 16)" SC_PIN="$pin" python3 - > .env.tmp <<'PY'
+import os, re, sys
+app = {'GATEWAY_API_KEY': os.environ['SC_KEY'], 'CAMERA_PLAYER': os.environ['SC_PLAYER'],
+       'RCON_PASSWORD': os.environ['SC_RCON'], 'STAFF_PIN': os.environ['SC_PIN']}
 for line in open('example.env'):
     m = re.match(r'^([A-Z0-9_]+)=', line)
     sys.stdout.write('%s=%s\n' % (m.group(1), app[m.group(1)]) if m and m.group(1) in app else line)
 PY
-  )
+  ) && mv .env.tmp .env
   ok "Wrote .env (camera player $player, staff PIN $pin)"
 else
-  ok "Keeping your .env (use --force with a bundle to rewrite it)"
+  ok "Keeping your .env (--force rewrites it; delete .env to enter a new service key)"
 fi
-[[ -n "$(envval GATEWAY_API_KEY .env)" ]] || die ".env has no GATEWAY_API_KEY. Re-run with your bundle and --force."
+[[ -n "$(envval GATEWAY_API_KEY .env)" ]] || die ".env has no GATEWAY_API_KEY. Delete .env and re-run."
 
 # ---------------------------------------------------------------------------------------------------------------------
 step "Model (Docker Model Runner)"
