@@ -1,6 +1,6 @@
 # Quickstart: run Storm the Castle on your Mac
 
-About 15 minutes, mostly downloads. You use the demo owner's SCM tenant, so there's no console setup on your side.
+About 15 minutes, mostly downloads. You use the SCM tenant `lhoskinson-us`, which is already set up, so there's no console setup on your side.
 
 ## Before you start
 - [ ] **A Mac** (Apple Silicon recommended: the guard is an 8B model running locally) with about 15 GB free.
@@ -51,5 +51,3 @@ Voice input is optional: `./setup.sh --whisper` installs local speech-to-text.
 | Smoke test fails with 401 | Your service key was revoked or mistyped. Ask the owner for a new bundle, then run `./setup.sh <bundle> --force`. |
 | Guard says "dozed off" | Check `docker model ls` shows the model, then `docker compose logs app`. |
 | No Minecraft licence | Set `VIEWER=1` in `.env`, run `docker compose up -d app`, then open http://localhost:3007. |
-
-Every AIRS check counts against the owner's tenant, so please don't run soak tests or red-team scans without asking.
