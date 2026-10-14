@@ -2,6 +2,19 @@
 
 About 20 minutes, mostly downloads. Everything runs on your Mac except the gateway's control plane, which is the SCM tenant **`lhoskinson-us`**. The demo's guardrails, configs and AIRS profiles already exist there; your only console job is to register your own gateway (step 1).
 
+## Short version
+**You'll need:** a Mac with about 15 GB free, Docker Desktop with Kubernetes enabled (Settings → Kubernetes → Enable, wait for green), Homebrew, and the two keys from the demo owner's email. Minecraft Java 1.21.4 is optional.
+
+1. **Register your gateway:** in Strata Cloud Manager, switch to tenant `lhoskinson-us` → AI Security → Home → AI Gateway tile → **Deploy Hybrid**. Name it `lappy-<yourname>`, select workspace `demo`, then **Download values.yaml** → **Done** → **Commit** (Commit is required).
+2. **Run setup:**
+   ```bash
+   git clone https://github.com/lhosko/holygrail.git storm-the-castle && cd storm-the-castle
+   ./setup.sh ~/Downloads/<the values.yaml you downloaded>
+   ```
+   It asks for the **AIRS API key** and the **gateway service key** (paste them; nothing shows as you type) and your Minecraft username. Please don't forward the keys or put them in chat or git.
+
+Setup takes about 15 minutes and ends with the URLs and your staff PIN. The detailed steps and troubleshooting follow.
+
 ## Before you start
 - [ ] **A Mac** (Apple Silicon recommended: the guard is an 8B model running locally) with about 15 GB free.
 - [ ] **Docker Desktop**, recent. Then turn on **Settings → Kubernetes → Enable Kubernetes → Apply** and wait until it shows green.
