@@ -122,8 +122,15 @@ fi
 
 # ---------------------------------------------------------------------------------------------------------------------
 step "Model (Docker Model Runner)"
-docker desktop enable model-runner --tcp 12434 >/dev/null 2>&1 \
-  || die "Couldn't enable Model Runner. Docker Desktop → Settings → AI → Enable Docker Model Runner + host-side TCP (port 12434)."
+# What the gateway needs is Model Runner answering on host TCP 12434. Test that; only try to switch it on if it doesn't
+# (the `docker desktop` CLI can fail even when Model Runner is already on, e.g. an old plugin or admin-locked settings).
+DMR_URL="http://localhost:12434/engines/v1/models"
+if ! curl -fsS -m 4 "$DMR_URL" >/dev/null 2>&1; then
+  docker desktop enable model-runner --tcp 12434 >/dev/null 2>&1 || true
+  wait_http "$DMR_URL" 30 \
+    || die "Model Runner isn't answering on localhost:12434. Docker Desktop → Settings → AI → Enable Docker Model Runner and Enable host-side TCP support (port 12434) → Apply, re-run."
+fi
+ok "Model Runner on localhost:12434"
 MODEL="$(envval MODEL .env)"; MODEL="${MODEL:-ai/llama3.1:8B-Q4_K_M}"
 if docker model inspect "$MODEL" >/dev/null 2>&1; then
   ok "$MODEL already pulled"
