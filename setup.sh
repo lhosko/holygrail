@@ -60,7 +60,8 @@ fi
 
 # Ports must be free, or held by Docker (that's us, from an earlier run).
 for p in 8787 3000 25565; do
-  holder="$(lsof -nP -iTCP:"$p" -sTCP:LISTEN 2>/dev/null | awk 'NR==2 {print $1}')"
+  # lsof exits 1 when nothing is listening; under pipefail that would end the script silently.
+  holder="$(lsof -nP -iTCP:"$p" -sTCP:LISTEN 2>/dev/null | awk 'NR==2 {print $1}' || true)"
   if [[ -n "$holder" && "$holder" != com.docke* ]]; then
     die "Port $p is in use by '$holder'. Stop it (lsof -nP -iTCP:$p -sTCP:LISTEN) and re-run."
   fi
